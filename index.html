@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>리빙아트 조명 쇼룸</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#1C1A16;--paper:#F4F0E8;--paper2:#EDE8DC;
+  --warm:#B8955A;--warm-pale:#F0E6CF;
+  --muted:#8A8277;--line:rgba(28,26,22,0.12);
+  --serif:'Cormorant Garamond',serif;--sans:'Noto Sans KR',sans-serif;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font-family:var(--sans);touch-action:none;}
+
+header{
+  position:fixed;top:0;left:0;right:0;height:54px;
+  background:var(--paper);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;padding:0 24px;
+  justify-content:space-between;z-index:200;
+}
+.logo{font-family:var(--serif);font-size:20px;font-weight:400;letter-spacing:0.05em;}
+.logo em{font-style:italic;color:var(--warm);}
+
+.zone-tabs{display:flex;gap:4px;}
+.zone-tab{
+  font-size:12px;font-weight:400;color:var(--muted);
+  background:none;border:1px solid var(--line);border-radius:100px;
+  padding:5px 13px;cursor:pointer;transition:all 0.2s;font-family:var(--sans);
+}
+.zone-tab:hover{color:var(--ink);border-color:rgba(28,26,22,0.3);}
+.zone-tab.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+#map-wrap{
+  position:fixed;top:54px;left:0;right:0;bottom:0;
+  overflow:hidden;cursor:grab;
+}
+#map-wrap:active{cursor:grabbing;}
+#map-stage{position:absolute;transform-origin:0 0;will-change:transform;}
+
+/* 핀 */
+.light-pin{cursor:pointer;}
+.pin-pulse{animation:pulse 2.8s ease-in-out infinite;transform-origin:center;}
+.pin-pulse2{animation:pulse 2.8s ease-in-out infinite 0.7s;transform-origin:center;}
+@keyframes pulse{
+  0%,100%{opacity:0;transform:scale(0.4);}
+  50%{opacity:0.28;transform:scale(1.5);}
+}
+.pin-dot{transition:r 0.18s,fill 0.18s;}
+.light-pin:hover .pin-dot{r:8;}
+.light-pin.active .pin-dot{fill:var(--warm)!important;}
+.light-pin.active .pin-pulse,.light-pin.active .pin-pulse2{stroke:var(--warm)!important;}
+.light-pin.dimmed{opacity:0.15;pointer-events:none;}
+
+/* 공간 영역 */
+.room-fill{transition:opacity 0.25s;}
+.room-fill.dimmed{opacity:0.12!important;}
+
+/* 패널 */
+#panel{
+  position:fixed;top:54px;right:0;bottom:0;width:320px;
+  background:var(--paper);border-left:1px solid var(--line);
+  transform:translateX(100%);
+  transition:transform 0.36s cubic-bezier(0.22,1,0.36,1);
+  z-index:150;display:flex;flex-direction:column;overflow:hidden;
+}
+#panel.open{transform:translateX(0);}
+body.panel-open #map-wrap{right:320px;transition:right 0.36s cubic-bezier(0.22,1,0.36,1);}
+
+.panel-close{
+  position:absolute;top:14px;right:14px;width:30px;height:30px;
+  background:none;border:1px solid var(--line);border-radius:50%;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:15px;color:var(--muted);transition:all 0.2s;z-index:10;
+}
+.panel-close:hover{background:var(--paper2);color:var(--ink);}
+
+.panel-img{
+  width:100%;aspect-ratio:4/3;background:var(--warm-pale);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;position:relative;overflow:hidden;
+}
+.panel-img::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(to bottom,transparent 55%,var(--paper) 100%);
+  pointer-events:none;
+}
+
+.panel-scroll{flex:1;overflow-y:auto;padding:16px 20px 110px;}
+.p-badge{font-size:10px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:var(--warm);margin-bottom:5px;}
+.p-zone{font-size:11px;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;margin-bottom:3px;}
+.p-name{font-family:var(--serif);font-size:26px;font-weight:300;line-height:1.2;margin-bottom:12px;}
+.p-desc{font-size:12px;color:var(--muted);line-height:1.85;font-weight:300;margin-bottom:18px;border-top:1px solid var(--line);padding-top:14px;}
+.spec-list{display:flex;flex-direction:column;margin-bottom:18px;}
+.spec-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:12px;}
+.spec-key{color:var(--muted);font-weight:300;}
+.spec-val{color:var(--ink);font-weight:400;text-align:right;}
+.mood-row{display:flex;flex-wrap:wrap;gap:5px;}
+.mood-pill{font-size:11px;color:#7A5F2E;background:var(--warm-pale);border-radius:100px;padding:4px 11px;}
+
+.panel-cta{
+  position:absolute;bottom:0;left:0;right:0;
+  background:var(--paper);border-top:1px solid var(--line);
+  padding:14px 20px 18px;display:flex;
+  align-items:center;justify-content:space-between;gap:10px;
+}
+.cta-lbl{font-size:10px;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;margin-bottom:2px;}
+.cta-price{font-family:var(--serif);font-size:20px;font-weight:400;}
+.btn-row{display:flex;gap:7px;}
+.btn{font-family:var(--sans);font-size:12px;font-weight:500;padding:9px 15px;border-radius:100px;cursor:pointer;transition:all 0.18s;border:none;white-space:nowrap;}
+.btn-o{background:none;border:1px solid var(--line);color:var(--ink);}
+.btn-o:hover{background:var(--paper2);}
+.btn-s{background:var(--ink);color:var(--paper);}
+.btn-s:hover{background:#3A3832;}
+
+.zoom-ctrl{position:fixed;bottom:24px;left:24px;display:flex;flex-direction:column;gap:4px;z-index:180;}
+.zoom-btn{
+  width:34px;height:34px;background:var(--paper);border:1px solid var(--line);
+  border-radius:7px;font-size:17px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--ink);transition:all 0.15s;
+}
+.zoom-btn:hover{background:var(--paper2);}
+
+.legend{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  display:flex;gap:14px;background:var(--paper);border:1px solid var(--line);
+  border-radius:100px;padding:7px 18px;font-size:11px;color:var(--muted);
+  letter-spacing:0.05em;z-index:180;align-items:center;
+}
+.ldot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;}
+.li{display:flex;align-items:center;}
+.lsep{width:1px;height:11px;background:var(--line);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LUMEN <em>Showroom</em></div>
+  <div class="zone-tabs" id="zoneTabs">
+    <button class="zone-tab active" data-zone="all">전체</button>
+    <button class="zone-tab" data-zone="furniture">가구 전시실</button>
+    <button class="zone-tab" data-zone="office">사무실</button>
+    <button class="zone-tab" data-zone="lounge">라운지</button>
+    <button class="zone-tab" data-zone="lighting">조명 전시실</button>
+  </div>
+</header>
+
+<div id="map-wrap">
+  <div id="map-stage">
+    <!-- 도면 비율: 실제 도면 가로:세로 ≈ 5:3.2, SVG 1200×780 -->
+    <svg id="floorplan" width="1200" height="780" viewBox="0 0 1200 780" xmlns="http://www.w3.org/2000/svg"
+         font-family="'Noto Sans KR',sans-serif">
+      <defs>
+        <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M20 0L0 0 0 20" fill="none" stroke="rgba(28,26,22,0.055)" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+
+      <!-- 배경 격자 -->
+      <rect width="1200" height="780" fill="url(#grid)"/>
+
+      <!-- ═══════════════════════════════════
+           외벽 전체
+      ════════════════════════════════════ -->
+      <!-- 메인 외벽 (도면 기준: 좌측 경사 제외한 직사각 구역) -->
+      <rect x="50" y="50" width="910" height="680" rx="0"
+            fill="none" stroke="#1C1A16" stroke-width="3"/>
+
+      <!-- 좌측 상단 대각 돌출부 (가구 전시실 좌벽) -->
+      <polygon points="50,50 50,320 10,320 10,50"
+               fill="#EDE8DC" stroke="#1C1A16" stroke-width="2"/>
+
+      <!-- ═══════════════════════════════════
+           내부 구획선
+      ════════════════════════════════════ -->
+      <!-- 가구전시실 | 사무실 세로 구분 (x=490) -->
+      <line x1="490" y1="50" x2="490" y2="440" stroke="#1C1A16" stroke-width="2"/>
+      <!-- 사무실 | 조명전시실 세로 구분 (x=730) -->
+      <line x1="730" y1="50" x2="730" y2="440" stroke="#1C1A16" stroke-width="2"/>
+      <!-- 상단 전시구역 | 하단 라운지 가로 구분 (y=440) -->
+      <line x1="50" y1="440" x2="960" y2="440" stroke="#1C1A16" stroke-width="2"/>
+      <!-- 라운지 | 조명전시실 세로 구분 (x=610) -->
+      <line x1="610" y1="440" x2="610" y2="730" stroke="#1C1A16" stroke-width="2"/>
+
+      <!-- 사무실 내 작은 구획 (간이 회의/서버룸 우측) -->
+      <line x1="730" y1="220" x2="960" y2="220" stroke="#1C1A16" stroke-width="1.5" stroke-dasharray="6,3"/>
+
+      <!-- ═══════════════════════════════════
+           공간 채우기 (hover/filter용)
+      ════════════════════════════════════ -->
+      <!-- 가구 전시실 -->
+      <rect class="room-fill" data-zone="furniture"
+            x="50" y="50" width="440" height="390" fill="#E5DDD0" opacity="0.38"/>
+      <!-- 사무실 -->
+      <rect class="room-fill" data-zone="office"
+            x="490" y="50" width="240" height="390" fill="#DDD6C6" opacity="0.38"/>
+      <!-- 조명 전시실 (상단) -->
+      <rect class="room-fill" data-zone="lighting"
+            x="730" y="50" width="230" height="390" fill="#D8D0BF" opacity="0.38"/>
+      <!-- 라운지·대기실 -->
+      <rect class="room-fill" data-zone="lounge"
+            x="50" y="440" width="560" height="290" fill="#E2DAC9" opacity="0.38"/>
+      <!-- 조명 전시실 (하단) -->
+      <rect class="room-fill" data-zone="lighting"
+            x="610" y="440" width="350" height="290" fill="#D8D0BF" opacity="0.38"/>
+
+      <!-- ═══════════════════════════════════
+           공간 레이블
+      ════════════════════════════════════ -->
+      <text x="70" y="80" font-family="'Cormorant Garamond',serif" font-size="12"
+            fill="#8A8277" letter-spacing="0.1em" text-decoration="none">FURNITURE SHOWROOM</text>
+      <text x="505" y="80" font-family="'Cormorant Garamond',serif" font-size="12"
+            fill="#8A8277" letter-spacing="0.1em">OFFICE</text>
+      <text x="745" y="80" font-family="'Cormorant Garamond',serif" font-size="12"
+            fill="#8A8277" letter-spacing="0.1em">LIGHTING</text>
+      <text x="70" y="468" font-family="'Cormorant Garamond',serif" font-size="12"
+            fill="#8A8277" letter-spacing="0.1em">LOUNGE · WAITING</text>
+      <text x="628" y="468" font-family="'Cormorant Garamond',serif" font-size="12"
+            fill="#8A8277" letter-spacing="0.1em">LIGHTING DISPLAY</text>
+
+      <!-- ═══════════════════════════════════
+           가구 실루엣 (참고용)
+      ════════════════════════════════════ -->
+      <!-- 가구전시실: 아일랜드 테이블 -->
+      <rect x="130" y="200" width="240" height="120" rx="4"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.18"/>
+      <text x="250" y="268" text-anchor="middle" font-size="9" fill="#A8A5A0" letter-spacing="0.06em">아일랜드</text>
+      <!-- 사무실: 책상+의자 -->
+      <rect x="520" y="140" width="170" height="90" rx="3"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.18"/>
+      <rect x="560" y="248" width="90" height="50" rx="3"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.15"/>
+      <!-- 라운지: 소파 -->
+      <rect x="80" y="560" width="200" height="100" rx="6"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.18"/>
+      <rect x="80" y="560" width="200" height="28" rx="4"
+            fill="none" stroke="#1C1A16" stroke-width="0.5" opacity="0.13"/>
+      <!-- 라운지: 테이블 -->
+      <rect x="320" y="580" width="120" height="60" rx="3"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.15"/>
+      <!-- 조명전시실(하단): 전시 박스 -->
+      <rect x="650" y="490" width="90" height="90" rx="3"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.2"/>
+      <rect x="760" y="490" width="90" height="90" rx="3"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.2"/>
+      <rect x="860" y="540" width="70" height="140" rx="3"
+            fill="none" stroke="#1C1A16" stroke-width="0.6" opacity="0.15"/>
+
+      <!-- ═══════════════════════════════════
+           7mm 마그네틱 트랙 (선으로 표시)
+      ════════════════════════════════════ -->
+      <!-- 가구전시실 마그네틱 트랙 -->
+      <line x1="100" y1="130" x2="460" y2="130"
+            stroke="#1C1A16" stroke-width="1.5" opacity="0.2" stroke-dasharray="none"/>
+      <text x="120" y="123" font-size="8" fill="#A8A5A0" letter-spacing="0.05em">7mm 마그네틱 트랙</text>
+      <!-- 조명전시실 마그네틱 트랙 -->
+      <line x1="640" y1="510" x2="840" y2="510"
+            stroke="#1C1A16" stroke-width="1.5" opacity="0.2"/>
+      <text x="645" y="504" font-size="8" fill="#A8A5A0" letter-spacing="0.05em">7mm 마그네틱 트랙</text>
+
+      <!-- ═══════════════════════════════════
+           조명 핀
+           도면 위치 매핑:
+           가구전시실(x50~490, y50~440)
+           사무실(x490~730, y50~440)
+           조명전시실상단(x730~960, y50~440)
+           라운지(x50~610, y440~730)
+           조명전시실하단(x610~960, y440~730)
+      ════════════════════════════════════ -->
+
+      <!-- ─── 가구 전시실 ─── -->
+
+      <!-- 45Ø 다운라이트 (도면 좌측 중상단) -->
+      <g class="light-pin" data-id="L01" data-zone="furniture" transform="translate(150,175)" style="animation-delay:0s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277" letter-spacing="0.04em">45Ø 다운라이트</text>
+      </g>
+
+      <!-- 7mm 마그네틱 핀 조명 (트랙 위, 좌) -->
+      <g class="light-pin" data-id="L02" data-zone="furniture" transform="translate(220,130)" style="animation-delay:0.3s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">마그네틱 핀</text>
+      </g>
+
+      <!-- 7mm 마그네틱 폴더 조명 (트랙 위, 우) -->
+      <g class="light-pin" data-id="L03" data-zone="furniture" transform="translate(370,130)" style="animation-delay:0.6s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">마그네틱 폴더</text>
+      </g>
+
+      <!-- 라인 펜던트 (가구전시실 중앙) -->
+      <g class="light-pin" data-id="L04" data-zone="furniture" transform="translate(270,310)" style="animation-delay:0.9s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">라인 펜던트</text>
+      </g>
+
+      <!-- 미니링 30 (좌측, 두 개) -->
+      <g class="light-pin" data-id="L05" data-zone="furniture" transform="translate(200,390)" style="animation-delay:1.1s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">미니링 30</text>
+      </g>
+
+      <g class="light-pin" data-id="L06" data-zone="furniture" transform="translate(350,390)" style="animation-delay:1.3s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">미니링 30</text>
+      </g>
+
+      <!-- ─── 사무실 ─── -->
+
+      <!-- 라인 펜던트 (사무실 중앙) -->
+      <g class="light-pin" data-id="L07" data-zone="office" transform="translate(610,160)" style="animation-delay:0.2s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">라인 펜던트</text>
+      </g>
+
+      <!-- 45Ø 건블랙 다운라이트 -->
+      <g class="light-pin" data-id="L08" data-zone="office" transform="translate(540,260)" style="animation-delay:0.5s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">45Ø 건블랙</text>
+      </g>
+
+      <!-- 아트 332 -->
+      <g class="light-pin" data-id="L09" data-zone="office" transform="translate(680,260)" style="animation-delay:0.8s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">아트 332</text>
+      </g>
+
+      <!-- 사각 트림리스 -->
+      <g class="light-pin" data-id="L10" data-zone="office" transform="translate(610,380)" style="animation-delay:1.0s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">사각 트림리스</text>
+      </g>
+
+      <!-- ─── 조명 전시실 (상단) ─── -->
+
+      <!-- 아트 506 (5구/10구) -->
+      <g class="light-pin" data-id="L11" data-zone="lighting" transform="translate(790,160)" style="animation-delay:0.4s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">아트 506</text>
+      </g>
+
+      <!-- 스타링 31 블랙 -->
+      <g class="light-pin" data-id="L12" data-zone="lighting" transform="translate(870,270)" style="animation-delay:0.7s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">스타링 31 블랙</text>
+      </g>
+
+      <!-- 스타링 48 블랙 -->
+      <g class="light-pin" data-id="L13" data-zone="lighting" transform="translate(790,370)" style="animation-delay:1.0s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">스타링 48 블랙</text>
+      </g>
+
+      <!-- ─── 라운지 · 대기실 ─── -->
+
+      <!-- 40Ø 아트스노우 -->
+      <g class="light-pin" data-id="L14" data-zone="lounge" transform="translate(140,540)" style="animation-delay:0.2s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">40Ø 아트스노우</text>
+      </g>
+
+      <!-- 45Ø 다운라이트 (라운지) -->
+      <g class="light-pin" data-id="L15" data-zone="lounge" transform="translate(340,540)" style="animation-delay:0.5s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">45Ø 다운라이트</text>
+      </g>
+
+      <!-- 미니 25 (좌) -->
+      <g class="light-pin" data-id="L16" data-zone="lounge" transform="translate(130,680)" style="animation-delay:0.8s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">미니 25</text>
+      </g>
+
+      <!-- 미니 25 (우) -->
+      <g class="light-pin" data-id="L17" data-zone="lounge" transform="translate(310,680)" style="animation-delay:1.0s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">미니 25</text>
+      </g>
+
+      <!-- 아트 217 -->
+      <g class="light-pin" data-id="L18" data-zone="lounge" transform="translate(500,620)" style="animation-delay:1.2s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">아트 217</text>
+      </g>
+
+      <!-- ─── 조명 전시실 (하단) ─── -->
+
+      <!-- 7mm 마그네틱 핀 (트랙 위) -->
+      <g class="light-pin" data-id="L19" data-zone="lighting" transform="translate(690,510)" style="animation-delay:0.3s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">마그네틱 핀</text>
+      </g>
+
+      <!-- 아트 232 실버 -->
+      <g class="light-pin" data-id="L20" data-zone="lighting" transform="translate(680,610)" style="animation-delay:0.6s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">아트 232 실버</text>
+      </g>
+
+      <!-- 아트 232 건블랙 -->
+      <g class="light-pin" data-id="L21" data-zone="lighting" transform="translate(790,610)" style="animation-delay:0.9s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">아트 232 건블랙</text>
+      </g>
+
+      <!-- 스타링 31 실버 -->
+      <g class="light-pin" data-id="L22" data-zone="lighting" transform="translate(890,530)" style="animation-delay:1.1s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">스타링 31 실버</text>
+      </g>
+
+      <!-- 스타 25 -->
+      <g class="light-pin" data-id="L23" data-zone="lighting" transform="translate(660,700)" style="animation-delay:1.3s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">스타 25</text>
+      </g>
+
+      <!-- 아트 314 -->
+      <g class="light-pin" data-id="L24" data-zone="lighting" transform="translate(790,700)" style="animation-delay:1.5s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">아트 314</text>
+      </g>
+
+      <!-- 아트문 우 45Ø -->
+      <g class="light-pin" data-id="L25" data-zone="lighting" transform="translate(910,680)" style="animation-delay:1.7s">
+        <circle class="pin-pulse" r="20" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-pulse2" r="13" fill="none" stroke="#1C1A16" stroke-width="0.8"/>
+        <circle class="pin-dot" r="6" fill="#1C1A16"/>
+        <text y="24" text-anchor="middle" font-size="9" fill="#8A8277">아트문 45Ø</text>
+      </g>
+
+      <!-- 나침반 -->
+      <g transform="translate(940,750)">
+        <circle r="14" fill="var(--paper)" stroke="rgba(28,26,22,0.14)" stroke-width="1"/>
+        <text text-anchor="middle" y="-3" font-size="8" font-family="'Cormorant Garamond',serif" fill="#8A8277">N</text>
+        <polygon points="0,-9 -2.5,1 2.5,1" fill="#1C1A16"/>
+      </g>
+      <!-- 스케일 -->
+      <g transform="translate(70,755)">
+        <line x1="0" y1="0" x2="50" y2="0" stroke="#8A8277" stroke-width="1"/>
+        <line x1="0" y1="-3" x2="0" y2="3" stroke="#8A8277" stroke-width="1"/>
+        <line x1="50" y1="-3" x2="50" y2="3" stroke="#8A8277" stroke-width="1"/>
+        <text x="25" y="-5" text-anchor="middle" font-size="8" fill="#8A8277">5m</text>
+      </g>
+    </svg>
+  </div>
+</div>
+
+<!-- 사이드 패널 -->
+<div id="panel">
+  <button class="panel-close" onclick="closePanel()">✕</button>
+  <div class="panel-img" id="panelImg">
+    <svg width="90" height="90" viewBox="0 0 90 90" fill="none" opacity="0.5">
+      <circle cx="45" cy="32" r="20" stroke="#B8955A" stroke-width="1.5"/>
+      <line x1="45" y1="4" x2="45" y2="12" stroke="#B8955A" stroke-width="1.5"/>
+      <path d="M28 46 Q45 64 62 46" stroke="#B8955A" stroke-width="1.5" fill="none"/>
+      <line x1="45" y1="64" x2="45" y2="86" stroke="#B8955A" stroke-width="1.5"/>
+      <circle cx="45" cy="32" r="6" fill="#B8955A" opacity="0.4"/>
+    </svg>
+  </div>
+  <div class="panel-scroll" id="panelScroll"></div>
+  <div class="panel-cta" id="panelCta"></div>
+</div>
+
+<div class="zoom-ctrl">
+  <button class="zoom-btn" onclick="zoom(1.2)">＋</button>
+  <button class="zoom-btn" onclick="zoom(0.83)">－</button>
+</div>
+
+<div class="legend">
+  <div class="li"><span class="ldot" style="background:#1C1A16"></span>조명 위치 클릭</div>
+  <div class="lsep"></div>
+  <div class="li" style="color:#B8955A">● 선택됨</div>
+</div>
+
+<script>
+// ── 조명 데이터 ──────────────────────────────
+const LIGHTS = {
+  L01:{name:"45Ø 다운라이트",zone:"가구 전시실",badge:null,
+    desc:"45mm 구경의 클래식 다운라이트. 넓은 배광각으로 전시 공간 전체를 균일하게 밝힙니다.",
+    kelvin:"3000K",watt:"12W",material:"알루미늄",size:"Ø45mm",price:"₩ 85,000",
+    moods:["매입형","균일조명","전시"]},
+  L02:{name:"7mm 마그네틱 핀 조명",zone:"가구 전시실",badge:"BEST",
+    desc:"7mm 슬림 마그네틱 레일에 장착하는 핀 스팟 조명. 자유로운 위치 이동과 각도 조절이 특징입니다.",
+    kelvin:"2700K",watt:"8W",material:"알루미늄 (블랙)",size:"H 60mm",price:"₩ 120,000",
+    moods:["마그네틱","스팟","조절형"]},
+  L03:{name:"7mm 마그네틱 폴더 조명",zone:"가구 전시실",badge:null,
+    desc:"접이식 암을 가진 마그네틱 레일 조명. 필요에 따라 각도를 접어 빛의 범위를 세밀하게 조절합니다.",
+    kelvin:"3000K",watt:"10W",material:"알루미늄 (블랙)",size:"H 80mm",price:"₩ 145,000",
+    moods:["마그네틱","폴더","조절형"]},
+  L04:{name:"라인 펜던트 조명",zone:"가구 전시실",badge:"NEW",
+    desc:"슬림한 선형 펜던트. 아일랜드 테이블 위를 우아하게 가로지르며 주방·다이닝 공간에 감각적인 라인을 더합니다.",
+    kelvin:"2700K",watt:"24W",material:"알루미늄 · 아크릴",size:"L 900mm",price:"₩ 380,000",
+    moods:["펜던트","라인","다이닝"]},
+  L05:{name:"미니링 30",zone:"가구 전시실",badge:null,
+    desc:"Ø30mm 소형 링형 다운라이트. 작지만 강렬한 존재감으로 포인트 조명 또는 군집 배치에 적합합니다.",
+    kelvin:"3000K",watt:"5W",material:"알루미늄",size:"Ø30mm",price:"₩ 65,000",
+    moods:["매입형","링","포인트"]},
+  L06:{name:"미니링 30",zone:"가구 전시실",badge:null,
+    desc:"Ø30mm 소형 링형 다운라이트. 작지만 강렬한 존재감으로 포인트 조명 또는 군집 배치에 적합합니다.",
+    kelvin:"3000K",watt:"5W",material:"알루미늄",size:"Ø30mm",price:"₩ 65,000",
+    moods:["매입형","링","포인트"]},
+  L07:{name:"라인 펜던트 조명",zone:"사무실",badge:"NEW",
+    desc:"사무 공간의 집중도를 높이는 선형 펜던트. 책상 위 균일한 조도를 확보하며 미니멀한 디자인이 특징.",
+    kelvin:"4000K",watt:"30W",material:"알루미늄 · 오팔 아크릴",size:"L 1200mm",price:"₩ 420,000",
+    moods:["펜던트","사무용","라인"]},
+  L08:{name:"45Ø 건블랙 다운라이트",zone:"사무실",badge:null,
+    desc:"건블랙 무광 마감의 45mm 다운라이트. 공간에 절제된 긴장감을 더하며 사무·상업 공간에 잘 어울립니다.",
+    kelvin:"3000K",watt:"12W",material:"알루미늄 (건블랙)",size:"Ø45mm",price:"₩ 98,000",
+    moods:["매입형","건블랙","사무"]},
+  L09:{name:"아트 332",zone:"사무실",badge:null,
+    desc:"직경 33.2mm의 정밀 가공 다운라이트. 높은 연색성(CRI 95+)으로 색감 왜곡 없이 공간을 밝힙니다.",
+    kelvin:"3000K",watt:"10W",material:"알루미늄 (건블랙)",size:"Ø33.2mm",price:"₩ 110,000",
+    moods:["매입형","고연색","프리미엄"]},
+  L10:{name:"사각 트림리스",zone:"사무실",badge:"NEW",
+    desc:"테두리가 없는 트림리스 사각 다운라이트. 천장면과 완전히 일체화되어 건축적으로 깔끔한 마감을 만듭니다.",
+    kelvin:"3000K",watt:"15W",material:"알루미늄",size:"80×80mm",price:"₩ 160,000",
+    moods:["트림리스","사각","건축조명"]},
+  L11:{name:"아트 506 (5구/10구)",zone:"조명 전시실",badge:"BEST",
+    desc:"다구(5구 또는 10구) 구성의 매입형 조명. 하나의 케이스에 여러 개의 광원을 배열해 넓은 공간을 효율적으로 조명합니다.",
+    kelvin:"3000K",watt:"30W/60W",material:"알루미늄",size:"Ø506mm",price:"₩ 580,000",
+    moods:["다구","매입형","대형"]},
+  L12:{name:"스타링 31 블랙",zone:"조명 전시실",badge:null,
+    desc:"직경 31mm 스타형 링 다운라이트 블랙 버전. 별 모양의 독특한 외관이 공간에 개성을 더합니다.",
+    kelvin:"2700K",watt:"7W",material:"알루미늄 (블랙)",size:"Ø31mm",price:"₩ 88,000",
+    moods:["스타링","블랙","포인트"]},
+  L13:{name:"스타링 48 블랙",zone:"조명 전시실",badge:null,
+    desc:"직경 48mm 대형 스타링 다운라이트. 한층 넓은 배광으로 공간 전체를 부드럽게 감쌉니다.",
+    kelvin:"2700K",watt:"12W",material:"알루미늄 (블랙)",size:"Ø48mm",price:"₩ 115,000",
+    moods:["스타링","블랙","대형"]},
+  L14:{name:"40Ø 아트스노우",zone:"라운지",badge:null,
+    desc:"눈송이를 연상시키는 독특한 디자인의 40mm 다운라이트. 부드러운 확산광이 대기 공간의 편안함을 높입니다.",
+    kelvin:"3000K",watt:"10W",material:"알루미늄 (화이트)",size:"Ø40mm",price:"₩ 95,000",
+    moods:["디자인","화이트","라운지"]},
+  L15:{name:"45Ø 다운라이트",zone:"라운지",badge:null,
+    desc:"45mm 구경 표준 다운라이트. 대기실·라운지의 기본 조도를 안정적으로 확보합니다.",
+    kelvin:"3000K",watt:"12W",material:"알루미늄",size:"Ø45mm",price:"₩ 85,000",
+    moods:["매입형","라운지","기본"]},
+  L16:{name:"미니 25",zone:"라운지",badge:null,
+    desc:"직경 25mm 초소형 다운라이트. 좁은 구멍으로 시각적 노이즈를 최소화하면서 포인트 빛을 연출합니다.",
+    kelvin:"3000K",watt:"4W",material:"알루미늄",size:"Ø25mm",price:"₩ 55,000",
+    moods:["초소형","매입","미니멀"]},
+  L17:{name:"미니 25",zone:"라운지",badge:null,
+    desc:"직경 25mm 초소형 다운라이트. 좁은 구멍으로 시각적 노이즈를 최소화하면서 포인트 빛을 연출합니다.",
+    kelvin:"3000K",watt:"4W",material:"알루미늄",size:"Ø25mm",price:"₩ 55,000",
+    moods:["초소형","매입","미니멀"]},
+  L18:{name:"아트 217",zone:"라운지",badge:"NEW",
+    desc:"직경 21.7mm의 슬림 다운라이트. 스타링 형태의 테두리가 고급스러운 포인트를 연출합니다.",
+    kelvin:"2700K",watt:"6W",material:"알루미늄",size:"Ø21.7mm",price:"₩ 78,000",
+    moods:["슬림","스타링","포인트"]},
+  L19:{name:"7mm 마그네틱 핀 조명",zone:"조명 전시실",badge:"BEST",
+    desc:"7mm 슬림 마그네틱 레일의 핀 스팟. 레일을 따라 자유롭게 이동하며 원하는 곳에 집중조명을 연출합니다.",
+    kelvin:"2700K",watt:"8W",material:"알루미늄 (블랙)",size:"H 60mm",price:"₩ 120,000",
+    moods:["마그네틱","스팟","조절형"]},
+  L20:{name:"아트 232 실버",zone:"조명 전시실",badge:null,
+    desc:"직경 23.2mm 스타링 다운라이트 실버 버전. 고광택 실버 마감이 프리미엄한 분위기를 만듭니다.",
+    kelvin:"3000K",watt:"8W",material:"알루미늄 (실버)",size:"Ø23.2mm",price:"₩ 92,000",
+    moods:["스타링","실버","고급"]},
+  L21:{name:"아트 232 건블랙",zone:"조명 전시실",badge:null,
+    desc:"직경 23.2mm 스타링 다운라이트 건블랙 버전. 무광 블랙 마감으로 모던하고 세련된 인상을 줍니다.",
+    kelvin:"3000K",watt:"8W",material:"알루미늄 (건블랙)",size:"Ø23.2mm",price:"₩ 92,000",
+    moods:["스타링","건블랙","모던"]},
+  L22:{name:"스타링 31 실버",zone:"조명 전시실",badge:null,
+    desc:"직경 31mm 스타링 다운라이트 실버 버전. 은은한 광택의 실버 마감이 공간에 우아함을 더합니다.",
+    kelvin:"2700K",watt:"7W",material:"알루미늄 (실버)",size:"Ø31mm",price:"₩ 88,000",
+    moods:["스타링","실버","우아함"]},
+  L23:{name:"스타 25",zone:"조명 전시실",badge:null,
+    desc:"직경 25mm 스타형 다운라이트. 별 형태 테두리의 소형 버전으로 섬세한 포인트 조명에 활용됩니다.",
+    kelvin:"3000K",watt:"5W",material:"알루미늄",size:"Ø25mm",price:"₩ 72,000",
+    moods:["스타","소형","포인트"]},
+  L24:{name:"아트 314",zone:"조명 전시실",badge:null,
+    desc:"직경 31.4mm 아트 시리즈 다운라이트. 정교한 마감과 높은 연색성으로 전시 조명에 최적화되었습니다.",
+    kelvin:"3000K",watt:"9W",material:"알루미늄",size:"Ø31.4mm",price:"₩ 102,000",
+    moods:["고연색","전시","정밀"]},
+  L25:{name:"아트문 우 45Ø",zone:"조명 전시실",badge:"NEW",
+    desc:"45mm 구경의 아트문 시리즈. 달처럼 은은하게 빛나는 독특한 배광 패턴이 전시 공간에 특별한 분위기를 연출합니다.",
+    kelvin:"2700K",watt:"14W",material:"알루미늄",size:"Ø45mm",price:"₩ 135,000",
+    moods:["아트문","분위기","전시"]},
+};
+
+// ── 패널 열기 ──────────────────────────────
+let activePin = null;
+
+document.querySelectorAll('.light-pin').forEach(pin => {
+  pin.addEventListener('click', e => {
+    e.stopPropagation();
+    if (activePin) activePin.classList.remove('active');
+    pin.classList.add('active');
+    activePin = pin;
+    openPanel(pin.dataset.id);
+  });
+});
+
+function lampSVG(){
+  return `<svg width="80" height="80" viewBox="0 0 80 80" fill="none" opacity="0.55">
+    <circle cx="40" cy="28" r="16" stroke="#B8955A" stroke-width="1.5"/>
+    <line x1="40" y1="4" x2="40" y2="12" stroke="#B8955A" stroke-width="1.5"/>
+    <path d="M26 40 Q40 56 54 40" stroke="#B8955A" stroke-width="1.5" fill="none"/>
+    <line x1="40" y1="56" x2="40" y2="76" stroke="#B8955A" stroke-width="1.5"/>
+    <circle cx="40" cy="28" r="5" fill="#B8955A" opacity="0.4"/>
+  </svg>`;
+}
+
+function openPanel(id){
+  const l = LIGHTS[id]; if(!l) return;
+  document.getElementById('panelScroll').innerHTML = `
+    ${l.badge?`<div class="p-badge">${l.badge}</div>`:''}
+    <div class="p-zone">${l.zone}</div>
+    <h2 class="p-name">${l.name}</h2>
+    <p class="p-desc">${l.desc}</p>
+    <div class="spec-list">
+      <div class="spec-row"><span class="spec-key">색온도</span><span class="spec-val">${l.kelvin}</span></div>
+      <div class="spec-row"><span class="spec-key">소비전력</span><span class="spec-val">${l.watt}</span></div>
+      <div class="spec-row"><span class="spec-key">소재</span><span class="spec-val">${l.material}</span></div>
+      <div class="spec-row"><span class="spec-key">크기</span><span class="spec-val">${l.size}</span></div>
+    </div>
+    <div class="mood-row">${l.moods.map(m=>`<span class="mood-pill">${m}</span>`).join('')}</div>
+  `;
+  document.getElementById('panelCta').innerHTML = `
+    <div><div class="cta-lbl">판매가</div><div class="cta-price">${l.price}</div></div>
+    <div class="btn-row">
+      <button class="btn btn-o" onclick="alert('카카오채널 연결')">카카오 문의</button>
+      <button class="btn btn-s" onclick="alert('전화: 02-1234-5678')">전화 상담</button>
+    </div>
+  `;
+  document.getElementById('panel').classList.add('open');
+  document.body.classList.add('panel-open');
+}
+
+function closePanel(){
+  document.getElementById('panel').classList.remove('open');
+  document.body.classList.remove('panel-open');
+  if(activePin){activePin.classList.remove('active');activePin=null;}
+}
+
+document.getElementById('map-wrap').addEventListener('click', e=>{
+  if(!e.target.closest('.light-pin')) closePanel();
+});
+
+// ── 존 필터 ──────────────────────────────────
+document.querySelectorAll('.zone-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.zone-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const z = tab.dataset.zone;
+    document.querySelectorAll('.light-pin').forEach(p=>{
+      p.classList.toggle('dimmed', z!=='all' && p.dataset.zone!==z);
+    });
+    document.querySelectorAll('.room-fill').forEach(r=>{
+      r.classList.toggle('dimmed', z!=='all' && r.dataset.zone!==z);
+    });
+    closePanel();
+  });
+});
+
+// ── 팬 & 줌 ──────────────────────────────────
+const stage = document.getElementById('map-stage');
+const wrap  = document.getElementById('map-wrap');
+let scale=1, tx=0, ty=0, dragging=false, lastX=0, lastY=0;
+
+function applyT(){ stage.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`; }
+
+function initPos(){
+  const ww=wrap.offsetWidth, wh=wrap.offsetHeight;
+  scale = Math.min(ww/1200, wh/780)*0.9;
+  tx=(ww-1200*scale)/2; ty=(wh-780*scale)/2;
+  applyT();
+}
+initPos();
+
+wrap.addEventListener('pointerdown',e=>{
+  if(e.target.closest('.light-pin')) return;
+  dragging=true; lastX=e.clientX; lastY=e.clientY;
+  wrap.setPointerCapture(e.pointerId);
+});
+wrap.addEventListener('pointermove',e=>{
+  if(!dragging) return;
+  tx+=e.clientX-lastX; ty+=e.clientY-lastY;
+  lastX=e.clientX; lastY=e.clientY; applyT();
+});
+wrap.addEventListener('pointerup',()=>{ dragging=false; });
+wrap.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const d=e.deltaY>0?0.88:1.13;
+  const r=wrap.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  tx=mx-(mx-tx)*d; ty=my-(my-ty)*d; scale*=d; applyT();
+},{passive:false});
+
+let touches=[], initDist=0, initScale=1;
+wrap.addEventListener('touchstart',e=>{
+  touches=[...e.touches];
+  if(touches.length===2){
+    initDist=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);
+    initScale=scale;
+  }
+},{passive:true});
+wrap.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    scale=Math.min(Math.max(initScale*dist/initDist,0.3),4); applyT();
+  }
+},{passive:true});
+
+function zoom(d){
+  const cx=wrap.offsetWidth/2, cy=wrap.offsetHeight/2;
+  tx=cx-(cx-tx)*d; ty=cy-(cy-ty)*d; scale*=d; applyT();
+}
+
+window.addEventListener('resize', initPos);
+</script>
+</body>
+</html>
